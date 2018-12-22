@@ -1,0 +1,37 @@
+
+#include <ESP8266WiFi.h>
+//User Settings
+////////////////////
+const char WIFI_SSID []    = "betty";//name of Wifi network
+const char WIFI_PASSWORD [] = "1Nashfamily1";
+
+
+////////////////////
+
+void setup() {
+  
+  Serial.begin(115200);
+  delay(500);
+  connectWifi();
+  
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+  Serial.print("We did it bois");
+  delay(1000);
+}
+
+void connectWifi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected!");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+}
