@@ -1,0 +1,199 @@
+#include <Arduino.h>
+
+#include <ESP8266WiFi.h>
+#include <JsonListener.h>
+#include "WundergroundForecast.h"
+#include<Adafruit_LEDBackpack.h>
+#include<Adafruit_GFX.h>
+# include<Wire.h>
+#include <LiquidCrystal.h>
+
+const boolean IS_METRIC = false;
+const boolean USE_PM = false;
+
+int sensorPin = A0; // select the input pin
+
+int sensorValue = 0; // variable to store the value coming from the sensor
+ int page = 1;
+ int pressed = 0;
+WundergroundForecast wunderground(IS_METRIC);
+const char* ESP_HOST_NAME = "esp-" + ESP.getFlashChipId();
+
+
+//User Settings
+////////////////////////////////////////////
+const char* WIFI_SSID     = "----------";//name of Wifi network
+const char* WIFI_PASSWORD = "----------";
+const String  WUNDERGRROUND_API_KEY = "----------";
+const String  WUNDERGR_UND_STATE_OR_COUNTRY = "----------";
+const String  WUNDERGR_UND_CITY = "----------";
+const String  WUNDERGRROUND_LANGUAGE = "EN";
+////////////////////////////////////////////
+
+
+int High = 0;
+int Low =  0;
+
+Adafruit_7segment matrix = Adafruit_7segment();
+LiquidCrystal lcd(16, 2, 0, 15, 13, 12);
+
+
+void connectWifi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("Connecting to ");
+  Serial.println(WIFI_SSID);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected!");
+  Serial.println(WiFi.localIP());
+  Serial.println();
+}
+
+void setup() {
+ Serial.begin(115200);
+  delay(500);
+  connectWifi();
+
+  Serial.print("Connecting");
+ lcd.begin(16, 2);
+  
+   matrix.begin(0x70);
+
+}
+
+
+void loop() {
+
+  Serial.println();
+  Serial.println("\n\nNext Loop-Step: " + String(millis()) + ":");
+  uint8_t maxForecasts = 10;
+  WGForecast forecasts[maxForecasts];
+  wunderground.updateForecast(forecasts, maxForecasts, WUNDERGRROUND_API_KEY, WUNDERGRROUND_LANGUAGE, WUNDERGR_UND_STATE_OR_COUNTRY, WUNDERGR_UND_CITY);
+
+ for (int i = 0; i < maxForecasts; i++) { //Gather maximum number of forcasts
+    Serial.println("------------------------------------");
+    Serial.println("ForecastIcon: " + forecasts[i].forecastIcon);
+    Serial.println("ForecastTitle: " + forecasts[i].forecastTitle);
+    Serial.println("ForecastLowTemp: " + forecasts[i].forecastLowTemp);
+    Serial.println("ForecastHighTemp: " + forecasts[i].forecastHighTemp);
+    Serial.println("ForecastDay: " + forecasts[i].forecastDay);
+    Serial.println("ForecastMonth: " + forecasts[i].forecastMonth);
+    Serial.println("ForecastText: " + forecasts[i].forecastText);
+    Serial.println("PoP: " + forecasts[i].PoP);
+ }
+//map all forcast data to variables
+String icon = forecasts[0].forecastIcon;
+
+String dayOfWeek =  forecasts[0].forecastTitle;
+
+String  LowS = forecasts[0].forecastLowTemp;
+int Low = LowS.toInt();
+
+String HighS = forecasts[0].forecastHighTemp;
+int High= HighS.toInt();
+
+String DateS = forecasts[1].forecastDay;
+int Date= (DateS.toInt()-1);
+
+String MonthS = forecasts[1].forecastMonth;
+int Month= MonthS.toInt();
+
+String PoPS = forecasts[0].PoP;
+int PoP= PoPS.toInt();
+
+String overview = forecasts[0].forecastText;
+
+
+
+
+
+
+
+// Display Code
+//=====================================================================================================
+//====================================================================================================
+
+for(int i=0; i <= 60000; i++){
+
+//Page Turner
+//pressed is a value stops the page from increating rapidly as the sensor is triggered.
+//0 means not pressed, 1 means pressed.
+
+ sensorValue = analogRead (sensorPin);
+
+if (sensorValue <=800 and pressed == 0){
+ lcd.clear();
+ delay(200);
+  page++;
+  pressed= 1;
+ 
+ }else if(sensorValue >= 700){
+  pressed = 0;
+ }else{
+  delay(10);
+ }
+
+//page Reset
+if (page == 2){
+  page = 1;
+}
+
+
+//                                            Pages
+//                                            Page 1 = day of week, date, month, simple forecast 
+//----------------------------------------------------------------------------------------------
+if (page == 1){
+
+//print data to LCD screen
+lcd.setCursor(0,0);
+lcd.print(dayOfWeek + " " + Month + "/" + Date);
+lcd.setCursor(0,1);
+lcd.print(icon);
+matrix.writeDisplay();
+
+// Daily High Low Display
+
+//Low temperature displaying
+int LowAV= Low*(-1);
+int HighAV= High*(-1);
+if (Low < 0 and Low >- 10){ //Allow displaying numbers between 0 and -9
+ 
+  matrix.writeDigitRaw(3,B01000000); //negative sign
+  matrix.writeDigitNum(4,(LowAV / 1) %10);
+  
+}else if (Low <= -10){
+  matrix.writeDigitRaw(3,B00111000);//L
+  matrix.writeDigitRaw(4,B00111111);//O
+}else if(Low >= 100){
+  matrix.writeDigitRaw(3,B01110110);//H
+  matrix.writeDigitRaw(4,B00110000);//I
+}else{
+matrix.writeDigitNum(3, (Low/10)%10);
+matrix.writeDigitNum(4, (Low/1)%10);
+}
+
+//High temperature Displaying
+if (High<0 and High>-10){
+  
+  matrix.writeDigitRaw(0,B01000000); //negative sign
+  matrix.writeDigitNum(1,(HighAV / 1) %10);
+  
+}else if (High <= -10){
+  matrix.writeDigitRaw(0,B00111000);//L
+  matrix.writeDigitRaw(1,B00111111);//O
+}else if(High >= 100){
+  matrix.writeDigitRaw(0,B01110110);//H
+  matrix.writeDigitRaw(1,B00110000);//I
+}else{
+matrix.writeDigitNum(0, (High/10)%10);
+matrix.writeDigitNum(1, (High/1)%10);
+}
+
+}
+delay(10);
+}
+
+}
