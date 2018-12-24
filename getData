@@ -1,13 +1,17 @@
 #include <ESP8266WiFi.h>
+#include <ArduinoJson.h>  
 #include <WiFiClient.h> 
 WiFiClient client;
 //User Settings
 ////////////////////
-const char WIFI_SSID []    = "----------";//name of Wifi network
-const char WIFI_PASSWORD [] = "----------";
-const String CITY = "----------"; //name of city
-const String COUNTRY = "--"; //2 digit country code (ISO 3166)
-const String APIKEY = "--------------------------------"; //API Key from Open Weather Map
+const char WIFI_SSID []    = "betty";//name of Wifi network
+const char WIFI_PASSWORD [] = "1Nashfamily1";
+const String CITY = "Littleton"; //name of city
+const String COUNTRY = "us"; //2 digit country code (ISO 3166)
+const String APIKEY = "3919a1a172e8d4667289835d17541172"; //API Key from Open Weather Map
+const int GMTCONVERSION = -7; //number of hours ahead or behing UTC/GMT
+const bool DaylightSavings = true; //your residence participates in jumping foreward 1 hour in the summer months (true or false)
+const bool metric = false; //false:imperical(fahrenheit) true: metric(celcius)
 ////////////////////
 const String LOCATION = CITY + "," + COUNTRY;
 
@@ -22,8 +26,9 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   Serial.print("We did it bois");
-  getWeather();
-  delay(1000);
+  String forecast = getForecast();
+  Serial.print(forecast);
+  delay(10000);
 }
 
 void connectWifi() {
@@ -40,27 +45,36 @@ void connectWifi() {
   Serial.println();
 }
 
-void getWeather(){
- Serial.println("\nStarting connection to server..."); 
- // if you get a connection, report back via serial: 
- if (client.connect("api.openweathermap.org", 80)) { 
-   Serial.println("connected to server"); 
-   // Make a HTTP request: 
-   client.print("GET /data/2.5/forecast?"); 
-   client.print("q="+LOCATION); 
-   client.print("&appid="+APIKEY); 
-   client.print("&cnt=3"); 
-   client.println("&units=metric"); 
-   client.println("Host: api.openweathermap.org"); 
-   client.println("Connection: close"); 
-   client.println(); 
- } else { 
-   Serial.println("unable to connect"); 
- } 
- delay(1000); 
- String line = ""; 
- while (client.connected()) { 
-   line = client.readStringUntil('\n'); 
-   Serial.println(line); 
- } 
+String getForecast(){
+  Serial.println("\nStarting connection to server..."); 
+  
+  // Connect to open weather map api
+  
+  if (client.connect("api.openweathermap.org", 80)) { 
+    Serial.println("connected to server"); 
+    // Make a HTTP request: 
+    client.print("GET /data/2.5/forecast?"); 
+    client.print("q="+LOCATION); 
+    client.print("&appid="+APIKEY); 
+    client.print("&cnt=20"); 
+    if(metric){
+      client.println("&units=metric");
+    }else{
+      client.println("&units=imperial"); 
+    }
+    client.println("Host: api.openweathermap.org"); 
+    client.println("Connection: close"); 
+    client.println(); 
+  } else { 
+    Serial.println("unable to connect"); 
+  } 
+  delay(1000); 
+  String line = ""; 
+
+  //read and store the forecast JSON string
+ 
+  while (client.connected()) { 
+    line = client.readStringUntil('\n');    
+  } 
+  return line;
 } 
