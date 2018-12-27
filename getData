@@ -1,14 +1,16 @@
 #include <ESP8266WiFi.h>
+#include <TimeLib.h>
 #include <ArduinoJson.h>  
 #include <WiFiClient.h> 
 WiFiClient client;
 //User Settings
 ////////////////////
-const char WIFI_SSID []    = "betty";//name of Wifi network
-const char WIFI_PASSWORD [] = "1Nashfamily1";
-const String CITY = "Littleton"; //name of city
-const String COUNTRY = "us"; //2 digit country code (ISO 3166)
-const String APIKEY = "3919a1a172e8d4667289835d17541172"; //API Key from Open Weather Map
+const char WIFI_SSID []    = "----------";//name of Wifi network
+const char WIFI_PASSWORD [] = "----------";
+const String CITY = "----------"; //name of city
+const String COUNTRY = "--"; //2 digit country code (ISO 3166)
+const String APIKEY = "--------------------------------"; //API Key from Open Weather Map
+const String WTAPILocation = "America/Denver"; // your location listed at http://worldtimeapi.org/ for example America/Denver
 const int GMTCONVERSION = -7; //number of hours ahead or behing UTC/GMT
 const bool DaylightSavings = true; //your residence participates in jumping foreward 1 hour in the summer months (true or false)
 const bool metric = false; //false:imperical(fahrenheit) true: metric(celcius)
