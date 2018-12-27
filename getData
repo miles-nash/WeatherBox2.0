@@ -11,13 +11,15 @@ const String CITY = "----------"; //name of city
 const String COUNTRY = "--"; //2 digit country code (ISO 3166)
 const String APIKEY = "--------------------------------"; //API Key from Open Weather Map
 const String WTAPILocation = "America/Denver"; // your location listed at http://worldtimeapi.org/ for example America/Denver
-const int GMTCONVERSION = -7; //number of hours ahead or behing UTC/GMT
-const bool DaylightSavings = true; //your residence participates in jumping foreward 1 hour in the summer months (true or false)
 const bool metric = false; //false:imperical(fahrenheit) true: metric(celcius)
 ////////////////////
 ////////////////////
 //JSON Variables
 String dt_txt0,dt_txt1,dt_txt2,dt_txt3,dt_txt4,dt_txt5,dt_txt6,dt_txt7,dt_txt8,dt_txt9,dt_txt10,dt_txt11,dt_txt12,dt_txt13,dt_txt14,dt_txt15,dt_txt16,dt_txt17;
+int timeOffset;
+
+
+
 
 const String LOCATION = CITY + "," + COUNTRY;
 
@@ -40,7 +42,7 @@ void loop() {
   String forecast = getForecast();
   //Serial.println("forcast" + forecast);
   parseForecast(forecast);
-  Serial.println(dt_txt0.substring(11,13));
+ // Serial.println(dt_txt0.substring(11,13));
   digitalClockDisplay();
   delay(10000);
 }
@@ -167,7 +169,7 @@ void parseForecast(String json){
   //Serial.print(dt_txt0.substring(11,13));
 
   //
-  int forecastsLeft = ((24 - dt_txt0.substring(11,13).toInt()+ GMTCONVERSION)/3);
+  int forecastsLeft = ((24 - dt_txt0.substring(11,13).toInt()+ timeOffset)/3);
   //if(DaylightSavings && 
   
   Serial.println("forecasts left: " + forecastsLeft);
@@ -180,4 +182,91 @@ void parseForecast(String json){
   
   
   
+}
+
+void parseCurrentWeather(String json){
+  Serial.println(json);
+  const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) +
+                            JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + 
+                            JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) +
+                            JSON_OBJECT_SIZE(6) + JSON_OBJECT_SIZE(12);
+
+ 
+  DynamicJsonBuffer jsonBuffer(bufferSize);
+  JsonObject& root = jsonBuffer.parseObject(json);
+  if (!root.success()) { 
+     Serial.println("parseObject() failed"); 
+     return; 
+  } 
+  
+  //set the current time
+ // String t = root["dt"];
+ // Serial.print("T" + t);
+ // setTime(t.toInt());
+ // adjustTime(3600*timeOffset);
+  
+}
+
+
+void updateTime(){
+ Serial.println("\nStarting connection to time api..."); 
+  
+  // Connect to world time api
+  
+  if (client.connect("worldtimeapi.org", 80)) { 
+    Serial.println("connected to server"); 
+    // Make a HTTP request:  
+    client.print("GET /api/timezone/"); 
+    client.print(WTAPILocation); 
+    client.print(" HTTP/1.1\r\n");
+    client.println("Host: worldtimeapi.org"); 
+    client.println("Connection: close"); 
+    client.println(); 
+  } else { 
+    Serial.println("unable to connect"); 
+  } 
+  delay(1000); 
+  String line = ""; 
+
+  //read and store the time JSON string
+ 
+  while (client.connected()) { 
+    line = client.readStringUntil('\n');    
+  } 
+
+  //parse the json string
+  Serial.println("line: " + line);
+  DynamicJsonBuffer jsonBuffer(JSON_OBJECT_SIZE(11));
+  JsonObject& root = jsonBuffer.parseObject(line);
+
+  //update time
+  String t = root["unixtime"];
+  String offset = root["utc_offset"];
+  timeOffset = offset.substring(0,3).toInt();
+  int updatedTime = t.toInt() + timeOffset * 3600;
+  setTime(updatedTime);
+} 
+
+void digitalClockDisplay()
+{
+  // digital clock display of the time
+  Serial.print(hour());
+  printDigits(minute());
+  printDigits(second());
+  Serial.print(" ");
+  Serial.print(day());
+  Serial.print(".");
+  Serial.print(month());
+  Serial.print(".");
+  Serial.print(year());
+  Serial.println();
+}
+
+void printDigits(int digits)
+{
+  // utility for digital clock display: prints preceding colon and leading 0
+  Serial.print(":");
+  if (digits < 10)
+    Serial.print('0');
+  Serial.print(digits);
 }
