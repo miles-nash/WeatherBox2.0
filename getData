@@ -13,6 +13,10 @@ const int GMTCONVERSION = -7; //number of hours ahead or behing UTC/GMT
 const bool DaylightSavings = true; //your residence participates in jumping foreward 1 hour in the summer months (true or false)
 const bool metric = false; //false:imperical(fahrenheit) true: metric(celcius)
 ////////////////////
+////////////////////
+//JSON Variables
+String dt_txt0,dt_txt1,dt_txt2,dt_txt3,dt_txt4,dt_txt5,dt_txt6,dt_txt7,dt_txt8,dt_txt9,dt_txt10,dt_txt11,dt_txt12,dt_txt13,dt_txt14,dt_txt15,dt_txt16,dt_txt17;
+
 const String LOCATION = CITY + "," + COUNTRY;
 
 void setup() {
@@ -25,9 +29,17 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.print("We did it bois");
+  
+  updateTime();
+  digitalClockDisplay();
+  String current = getCurrentWeather();
+  parseCurrentWeather(current);
+  //Serial.println("Current" + current);
   String forecast = getForecast();
-  Serial.print(forecast);
+  //Serial.println("forcast" + forecast);
+  parseForecast(forecast);
+  Serial.println(dt_txt0.substring(11,13));
+  digitalClockDisplay();
   delay(10000);
 }
 
@@ -46,7 +58,7 @@ void connectWifi() {
 }
 
 String getForecast(){
-  Serial.println("\nStarting connection to server..."); 
+  Serial.println("\nStarting connection to forecast api..."); 
   
   // Connect to open weather map api
   
@@ -71,10 +83,99 @@ String getForecast(){
   delay(1000); 
   String line = ""; 
 
-  //read and store the forecast JSON string
+  //read, store, and return the forecast JSON string
  
   while (client.connected()) { 
     line = client.readStringUntil('\n');    
   } 
   return line;
 } 
+
+
+String getCurrentWeather(){
+ Serial.println("\nStarting connection to current weather api..."); 
+  
+  // Connect to open weather map api
+  
+  if (client.connect("api.openweathermap.org", 80)) { 
+    Serial.println("connected to server"); 
+    // Make a HTTP request: 
+    client.print("GET /data/2.5/weather?"); 
+    client.print("q="+LOCATION); 
+    client.print("&appid="+APIKEY); 
+    if(metric){
+      client.println("&units=metric");
+    }else{
+      client.println("&units=imperial"); 
+    }
+    client.println("Host: api.openweathermap.org"); 
+    client.println("Connection: close"); 
+    client.println(); 
+  } else { 
+    Serial.println("unable to connect"); 
+  } 
+  delay(1000); 
+  String line = ""; 
+
+  //read, store, and return the forecast JSON string
+ 
+  while (client.connected()) { 
+    line = client.readStringUntil('\n');    
+  } 
+  return line;
+} 
+
+
+
+void parseForecast(String json){
+  Serial.println(json);
+  const size_t bufferSize = 20*JSON_ARRAY_SIZE(1) + JSON_ARRAY_SIZE(20)
+                            + 16*JSON_OBJECT_SIZE(0) + 55*JSON_OBJECT_SIZE(1)
+                            + 21*JSON_OBJECT_SIZE(2) + 20*JSON_OBJECT_SIZE(4)
+                            + 2*JSON_OBJECT_SIZE(5) + 2*JSON_OBJECT_SIZE(7)
+                            + 25*JSON_OBJECT_SIZE(8) + 13*JSON_OBJECT_SIZE(9)
+                            + 6460;
+ 
+  DynamicJsonBuffer jsonBuffer(bufferSize);
+  JsonObject& root = jsonBuffer.parseObject(json);
+  if (!root.success()) { 
+     Serial.println("parseObject() failed"); 
+     return; 
+  } 
+
+  //assign data values global variables
+  String dt_txt0 = root["list"][0]["dt_txt"];
+  String dt_txt1 = root["list"][1]["dt_txt"];
+  String dt_txt2 = root["list"][2]["dt_txt"];
+  String dt_txt3 = root["list"][3]["dt_txt"];
+  String dt_txt4 = root["list"][4]["dt_txt"];
+  String dt_txt5 = root["list"][5]["dt_txt"];
+  String dt_txt6 = root["list"][6]["dt_txt"];
+  String dt_txt7 = root["list"][7]["dt_txt"];
+  String dt_txt8 = root["list"][8]["dt_txt"];
+  String dt_txt9 = root["list"][9]["dt_txt"];
+  String dt_txt10 = root["list"][10]["dt_txt"];
+  String dt_txt11 = root["list"][11]["dt_txt"];
+  String dt_txt12 = root["list"][12]["dt_txt"];
+  String dt_txt13 = root["list"][13]["dt_txt"];
+  String dt_txt14 = root["list"][14]["dt_txt"];
+  String dt_txt15 = root["list"][15]["dt_txt"];
+  String dt_txt16 = root["list"][16]["dt_txt"];
+  String dt_txt17 = root["list"][17]["dt_txt"];
+  //Serial.print(dt_txt0.substring(11,13));
+
+  //
+  int forecastsLeft = ((24 - dt_txt0.substring(11,13).toInt()+ GMTCONVERSION)/3);
+  //if(DaylightSavings && 
+  
+  Serial.println("forecasts left: " + forecastsLeft);
+
+  int maxTemp;
+  int minTemp;
+ // for (int i = 0; i < forecastsLeft; i ++){
+    
+ // }
+  
+  
+  
+}
