@@ -3,6 +3,10 @@
 #include <ArduinoJson.h>  
 #include <WiFiClient.h> 
 WiFiClient client;
+#include<Adafruit_LEDBackpack.h>
+#include<Adafruit_GFX.h>
+#include<Wire.h>
+#include <LiquidCrystal.h>
 //User Settings
 ////////////////////
 const char WIFI_SSID []    = "----------";//name of Wifi network
@@ -12,39 +16,58 @@ const String COUNTRY = "--"; //2 digit country code (ISO 3166)
 const String APIKEY = "--------------------------------"; //API Key from Open Weather Map
 const String WTAPILocation = "America/Denver"; // your location listed at http://worldtimeapi.org/ for example America/Denver
 const bool metric = false; //false:imperical(fahrenheit) true: metric(celcius)
+const bool MDY = true; //true: month/date/year, false: date/month/year
+const bool AMPM = true; //true: use 12 hour time with AM and PM, false: use 24 hour time
 ////////////////////
 ////////////////////
 //JSON Variables
 String dt_txt0,dt_txt1,dt_txt2,dt_txt3,dt_txt4,dt_txt5,dt_txt6,dt_txt7,dt_txt8,dt_txt9,dt_txt10,dt_txt11,dt_txt12,dt_txt13,dt_txt14,dt_txt15,dt_txt16,dt_txt17;
+
+char* months[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+
 int timeOffset;
-
-
-
-
+int sensorPin = A0; // select the input pin
+Adafruit_7segment matrix = Adafruit_7segment();
+LiquidCrystal lcd(16, 2, 0, 15, 13, 12);
 const String LOCATION = CITY + "," + COUNTRY;
 
 void setup() {
   
   Serial.begin(115200);
   delay(500);
-  connectWifi();
   
+  //start display
+  lcd.begin(16, 2);
+  matrix.begin(0x70);
+
+  //display loading sign
+  lcd.clear();
+  lcd.setCursor(3,0);
+  lcd.print("Loading...");
+  
+  connectWifi();
+
+  //get updated api information
+  updateTime();
+  String current = getCurrentWeather();
+  parseCurrentWeather(current);
+  String forecast = getForecast();
+  parseForecast(forecast);
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   
-  updateTime();
-  digitalClockDisplay();
-  String current = getCurrentWeather();
-  parseCurrentWeather(current);
-  //Serial.println("Current" + current);
-  String forecast = getForecast();
-  //Serial.println("forcast" + forecast);
-  parseForecast(forecast);
- // Serial.println(dt_txt0.substring(11,13));
-  digitalClockDisplay();
-  delay(10000);
+  //updateTime();
+ // digitalClockDisplay();
+  //String current = getCurrentWeather();
+  //parseCurrentWeather(current);
+  //String forecast = getForecast();
+  //parseForecast(forecast);
+  //digitalClockDisplay();
+  
+  displayDateTime();
+  delay(100);
 }
 
 void connectWifi() {
@@ -132,7 +155,6 @@ String getCurrentWeather(){
 
 
 void parseForecast(String json){
-  Serial.println(json);
   const size_t bufferSize = 20*JSON_ARRAY_SIZE(1) + JSON_ARRAY_SIZE(20)
                             + 16*JSON_OBJECT_SIZE(0) + 55*JSON_OBJECT_SIZE(1)
                             + 21*JSON_OBJECT_SIZE(2) + 20*JSON_OBJECT_SIZE(4)
@@ -185,7 +207,6 @@ void parseForecast(String json){
 }
 
 void parseCurrentWeather(String json){
-  Serial.println(json);
   const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) +
                             JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + 
                             JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) +
@@ -235,7 +256,6 @@ void updateTime(){
   } 
 
   //parse the json string
-  Serial.println("line: " + line);
   DynamicJsonBuffer jsonBuffer(JSON_OBJECT_SIZE(11));
   JsonObject& root = jsonBuffer.parseObject(line);
 
@@ -247,26 +267,58 @@ void updateTime(){
   setTime(updatedTime);
 } 
 
-void digitalClockDisplay()
-{
-  // digital clock display of the time
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
-  Serial.print(" ");
-  Serial.print(day());
-  Serial.print(".");
-  Serial.print(month());
-  Serial.print(".");
-  Serial.print(year());
-  Serial.println();
-}
 
-void printDigits(int digits)
-{
-  // utility for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if (digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
+
+
+void displayDateTime(){
+  //print data to LCD screen
+  //clear previous data
+  lcd.clear();
+  matrix.clear();
+
+  //write to lcd screen 
+
+  //deal with am and pm on lcd display
+  if(AMPM){
+    //print AM or PM sign
+    lcd.setCursor(7,0);
+    if(hour() >= 12){
+      lcd.print("PM");
+    }else{
+      lcd.print("AM");
+    }
+
+    //allows room for AM/PM sign by moving the date to 2nd row of lcd
+    lcd.setCursor(3,1);
+  }else{
+    lcd.setCursor(3,0);
+  }
+
+  //display date data
+  if(MDY){
+    lcd.print(String(month()) + "/" + String(day()) + "/" + String(year()));
+  }
+  else
+  {
+    lcd.print(String(day()) + "/" + String(month()) + "/" + String(year()));
+  }
+  
+  //print time to matrix
+  if(AMPM && hour() > 12){
+    matrix.writeDigitNum(1, hour()%10 -2);
+  }else{
+    matrix.writeDigitNum(0, hour()/10);
+    matrix.writeDigitNum(1, hour()%10);
+  }
+  matrix.writeDigitNum(3, minute()/10);
+  matrix.writeDigitNum(4, minute()%10);
+  matrix.drawColon(true);
+
+  //replace 0 with 12 for AMPM users
+  if(AMPM && hour() == 0){
+    matrix.writeDigitNum(0, 1);
+    matrix.writeDigitNum(1, 2);
+  }
+  matrix.writeDisplay();
+  delay(10);
 }
