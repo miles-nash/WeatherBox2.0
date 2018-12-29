@@ -22,7 +22,17 @@ const bool AMPM = true; //true: use 12 hour time with AM and PM, false: use 24 h
 ////////////////////
 //JSON Variables
 String dt_txt0,dt_txt1,dt_txt2,dt_txt3,dt_txt4,dt_txt5,dt_txt6,dt_txt7,dt_txt8,dt_txt9,dt_txt10,dt_txt11,dt_txt12,dt_txt13,dt_txt14,dt_txt15,dt_txt16,dt_txt17;
+int dailyHigh;
+int dailyLow;
+String currentDescription;
+int currentTemp;
+String forecastDescription;
 
+int page = 0;
+int pressed = 0;
+int sensorValue = 0;// variable to store the value coming from the sensor
+
+int daysInMonth[] = {31,28,31,30,31,30,31,31,30,31,30,31};
 char* months[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
 
 int timeOffset;
@@ -30,6 +40,9 @@ int sensorPin = A0; // select the input pin
 Adafruit_7segment matrix = Adafruit_7segment();
 LiquidCrystal lcd(16, 2, 0, 15, 13, 12);
 const String LOCATION = CITY + "," + COUNTRY;
+
+int lastAPICall = 0;
+int APIDelay = 600000;
 
 void setup() {
   
@@ -48,29 +61,53 @@ void setup() {
   connectWifi();
 
   //get updated api information
-  updateTime();
-  String current = getCurrentWeather();
-  parseCurrentWeather(current);
-  String forecast = getForecast();
-  parseForecast(forecast);
+  matrix.clear();
+  updateAPIs();
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  if(millis() - lastAPICall >= APIDelay && second() < 10){
+    updateAPIs();
+  }
+  //Serial.println(second());
+  //displayForecast();
+
+
+  //Page Turner
+  //pressed is a value stops the page from increating rapidly as the sensor is triggered.
+  //0 means not pressed, 1 means pressed.
+
+  sensorValue = analogRead (sensorPin);
+  if (sensorValue <=800 and pressed == 0){
+   lcd.clear();
+   delay(200);
+    page++;
+    pressed= 1;
+   
+   }else if(sensorValue >= 700){
+    pressed = 0;
+   }else{
+    delay(10);
+   }
   
-  //updateTime();
- // digitalClockDisplay();
-  //String current = getCurrentWeather();
-  //parseCurrentWeather(current);
-  //String forecast = getForecast();
-  //parseForecast(forecast);
-  //digitalClockDisplay();
-  
-  displayDateTime();
-  delay(100);
+  //page Reset
+  if (page == 2){
+    page = 0;
+  }
+
+  if(page == 0){
+    displayDateTime();
+  }else if(page == 1 && (pressed == 1 || lastAPICall == 1000)){
+    displayForecast();
+  }
+
+
+
 }
 
 void connectWifi() {
+  //connect to wifi
+  
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   Serial.print("Connecting to ");
   Serial.println(WIFI_SSID);
@@ -85,6 +122,8 @@ void connectWifi() {
 }
 
 String getForecast(){
+  //retreives forecast weather data from open weather map api
+  
   Serial.println("\nStarting connection to forecast api..."); 
   
   // Connect to open weather map api
@@ -120,6 +159,8 @@ String getForecast(){
 
 
 String getCurrentWeather(){
+  //retreives current weather data from open weather map api
+  
  Serial.println("\nStarting connection to current weather api..."); 
   
   // Connect to open weather map api
@@ -155,6 +196,8 @@ String getCurrentWeather(){
 
 
 void parseForecast(String json){
+  //parses forecast weather JSON string and updates global variables
+  
   const size_t bufferSize = 20*JSON_ARRAY_SIZE(1) + JSON_ARRAY_SIZE(20)
                             + 16*JSON_OBJECT_SIZE(0) + 55*JSON_OBJECT_SIZE(1)
                             + 21*JSON_OBJECT_SIZE(2) + 20*JSON_OBJECT_SIZE(4)
@@ -170,43 +213,26 @@ void parseForecast(String json){
   } 
 
   //assign data values global variables
-  String dt_txt0 = root["list"][0]["dt_txt"];
-  String dt_txt1 = root["list"][1]["dt_txt"];
-  String dt_txt2 = root["list"][2]["dt_txt"];
-  String dt_txt3 = root["list"][3]["dt_txt"];
-  String dt_txt4 = root["list"][4]["dt_txt"];
-  String dt_txt5 = root["list"][5]["dt_txt"];
-  String dt_txt6 = root["list"][6]["dt_txt"];
-  String dt_txt7 = root["list"][7]["dt_txt"];
-  String dt_txt8 = root["list"][8]["dt_txt"];
-  String dt_txt9 = root["list"][9]["dt_txt"];
-  String dt_txt10 = root["list"][10]["dt_txt"];
-  String dt_txt11 = root["list"][11]["dt_txt"];
-  String dt_txt12 = root["list"][12]["dt_txt"];
-  String dt_txt13 = root["list"][13]["dt_txt"];
-  String dt_txt14 = root["list"][14]["dt_txt"];
-  String dt_txt15 = root["list"][15]["dt_txt"];
-  String dt_txt16 = root["list"][16]["dt_txt"];
-  String dt_txt17 = root["list"][17]["dt_txt"];
-  //Serial.print(dt_txt0.substring(11,13));
+  dailyHigh = root["list"][0]["main"]["temp"];
+  dailyLow = root["list"][0]["main"]["temp"];
+  
+  for(int i = 0; i < 8; i ++){
+    if(root["list"][i]["main"]["temp"] > dailyHigh){
+      dailyHigh = root["list"][i]["main"]["temp"];
+    }
 
-  //
-  int forecastsLeft = ((24 - dt_txt0.substring(11,13).toInt()+ timeOffset)/3);
-  //if(DaylightSavings && 
-  
-  Serial.println("forecasts left: " + forecastsLeft);
-
-  int maxTemp;
-  int minTemp;
- // for (int i = 0; i < forecastsLeft; i ++){
-    
- // }
-  
-  
-  
+    if(root["list"][i]["main"]["temp"] < dailyLow){
+      dailyLow = root["list"][i]["main"]["temp"];
+    }
+  }
+  const char* d = root["list"][1]["weather"][0]["description"];
+  forecastDescription = d;
+  Serial.println("describe: " + forecastDescription);
 }
 
 void parseCurrentWeather(String json){
+  //parses current weather JSON string and updates global variables
+  
   const size_t bufferSize = JSON_ARRAY_SIZE(1) + JSON_OBJECT_SIZE(1) +
                             JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(3) + 
                             JSON_OBJECT_SIZE(4) + JSON_OBJECT_SIZE(5) +
@@ -219,17 +245,16 @@ void parseCurrentWeather(String json){
      Serial.println("parseObject() failed"); 
      return; 
   } 
-  
-  //set the current time
- // String t = root["dt"];
- // Serial.print("T" + t);
- // setTime(t.toInt());
- // adjustTime(3600*timeOffset);
-  
+
+  currentTemp = root["main"]["temp"];
+  const char* description = root["weather"][0]["description"];
+  currentDescription = description;
 }
 
 
 void updateTime(){
+  //updates current time from world time api
+  
  Serial.println("\nStarting connection to time api..."); 
   
   // Connect to world time api
@@ -259,18 +284,27 @@ void updateTime(){
   DynamicJsonBuffer jsonBuffer(JSON_OBJECT_SIZE(11));
   JsonObject& root = jsonBuffer.parseObject(line);
 
+  int oldYear = year();
+
   //update time
   String t = root["unixtime"];
   String offset = root["utc_offset"];
   timeOffset = offset.substring(0,3).toInt();
-  int updatedTime = t.toInt() + timeOffset * 3600;
+  int updatedTime = t.toInt() + timeOffset * 3600 +3;
   setTime(updatedTime);
+
+  //if the year changes, the days per month may if it is leapyear
+  if(oldYear != year()){
+    updateLeapYear();
+  }
 } 
 
 
 
 
 void displayDateTime(){
+  //displays current date on lcd and current time on 7 segment display
+  
   //print data to LCD screen
   //clear previous data
   lcd.clear();
@@ -279,7 +313,7 @@ void displayDateTime(){
   //write to lcd screen 
 
   //deal with am and pm on lcd display
-  if(AMPM){
+  if(AMPMSign){
     //print AM or PM sign
     lcd.setCursor(7,0);
     if(hour() >= 12){
@@ -295,13 +329,7 @@ void displayDateTime(){
   }
 
   //display date data
-  if(MDY){
-    lcd.print(String(month()) + "/" + String(day()) + "/" + String(year()));
-  }
-  else
-  {
-    lcd.print(String(day()) + "/" + String(month()) + "/" + String(year()));
-  }
+  printDate();
   
   //print time to matrix
   if(AMPM && hour() > 12){
@@ -321,4 +349,148 @@ void displayDateTime(){
   }
   matrix.writeDisplay();
   delay(10);
+}
+
+void countdownClock(int h, int m, int d, int y){
+  //takes in hour(24 hour time), month, date, and year
+  //displays time left until that date
+  int currentDate = totalDate(month(),day(),year());
+  int countdownDate = totalDate(m, d, y);
+  int daysLeft = countdownDate - currentDate -1;
+
+  int hoursLeft;
+  if (hour() > h){
+    hoursLeft = 24 + h - hour() - 1;
+  }else{
+    hoursLeft = h - hour() - 1;
+  }
+
+  int minutesLeft = 59 - minute();
+  int secondsLeft = 60 - second();
+
+  
+  Serial.println(String(daysLeft) + "." + String(hoursLeft) + "." + String(minutesLeft) + "." + String(secondsLeft));
+
+  
+
+}
+
+void updateAPIs(){
+  //update values associated with:
+  //forecast weather
+  //current weather
+  //current time
+
+  updateTime();
+  String current = getCurrentWeather();
+  parseCurrentWeather(current);
+  String forecast = getForecast();
+  parseForecast(forecast);
+  Serial.println("APIs updated");
+  lastAPICall = millis();
+}
+
+void updateLeapYear(){
+  //changes number of days in february if this year is a leapyear
+  if (year()%4  == 0) {
+    if (year()%100 != 0) {
+      daysInMonth[1] = 29;
+    }
+    else {
+      if (year()%400 == 0) {
+        daysInMonth[1] = 29;
+      }
+    }
+  }  
+}
+
+int totalDate(int m, int d, int y){
+  //takes in a month date and year
+  //calculates and returns the number of days since the December 31 1999
+  //1/1/2000 = 1
+ int days = 0;
+ for(int monthID = 1; monthID < m; monthID++){
+   days += daysInMonth[monthID -1];
+ }
+ days += d;
+ days += (y - 2000)*365;
+ return days;
+}
+
+void displayForecast(){
+  lcd.clear();
+  matrix.clear();
+  
+  //print data to LCD screen
+  lcd.print("   High | Low");
+  lcd.setCursor(0,1);
+  lcd.print(centerText(String(forecastDescription))); //description of weather in 3-6 hours
+  matrix.writeDisplay();
+  writeMatrix(dailyHigh, dailyLow);
+ 
+  matrix.writeDisplay();
+  delay(20);
+
+}
+
+void printDate(){
+  //print month date and year based on preferances onto the lcd
+  if(MDY){
+    lcd.print(String(month()) + "/" + String(day()) + "/" + String(year()));
+  }
+  else
+  {
+    lcd.print(String(day()) + "/" + String(month()) + "/" + String(year()));
+  }
+}
+
+void writeMatrix(int High, int Low){
+  //take in high(first 2 digits) and low(last 2 digits) on 7 seg display
+  
+  //Low temperature displaying
+  //matrix.clear();
+  int LowAV= Low*(-1);
+  int HighAV= High*(-1);
+  if (Low < 0 and Low >- 10){ //Allow displaying numbers between 0 and -9
+   
+    matrix.writeDigitRaw(3,B01000000); //negative sign
+    matrix.writeDigitNum(4,(LowAV / 1) %10);
+    
+  }else if (Low <= -10){
+    matrix.writeDigitRaw(3,B00111000);//L
+    matrix.writeDigitRaw(4,B00111111);//O
+  }else if(Low >= 100){
+    matrix.writeDigitRaw(3,B01110110);//H
+    matrix.writeDigitRaw(4,B00110000);//I
+  }else{
+    matrix.writeDigitNum(3, (Low/10)%10);
+    matrix.writeDigitNum(4, (Low/1)%10);
+  }
+  
+  //High temperature Displaying
+  if (High<0 and High>-10){
+    
+    matrix.writeDigitRaw(0,B01000000); //negative sign
+    matrix.writeDigitNum(1,(HighAV / 1) %10);
+    
+  }else if (High <= -10){
+    matrix.writeDigitRaw(0,B00111000);//L
+    matrix.writeDigitRaw(1,B00111111);//O
+  }else if(High >= 100){
+    matrix.writeDigitRaw(0,B01110110);//H
+    matrix.writeDigitRaw(1,B00110000);//I
+  }else{
+    matrix.writeDigitNum(0, (High/10)%10);
+    matrix.writeDigitNum(1, (High/1)%10);
+  } 
+}
+
+
+String centerText(String init){
+  //takes in text string under 16 chars, adds spaces to center it in lcd, returns new string
+  int available = 16 - init.length();
+  for (int i = 0; i < (available/2); i ++){
+    init = " " + init;
+  }
+  return init;
 }
